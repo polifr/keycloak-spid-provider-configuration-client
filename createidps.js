@@ -7,7 +7,11 @@ const {
     httpCallKeycloakCreateIdP,
     httpCallKeycloakDeleteIdP,
     httpCallKeycloakCreateAllMappers,
-    httpGrabKeycloaktokenOnce
+    httpGrabKeycloaktokenOnce,
+    httpCallKeycloakGetRsaKeyPriority,
+    httpCallKeycloakGetRsaProviders,
+    httpCallKeycloakCreateSpidRsaProvider,
+    httpCallKeycloakDeleteProvider
 } = require('./src/http')
 
 
@@ -138,4 +142,87 @@ httpGrabKeycloaktokenOnce().then(token => {
     console.log('Successfully retrieved Keycloak token');
     config.token = token;
     createKeycloackSpidIdPsMappers$.subscribe(console.log);
+    if (config.createSpidRsaProvider === 'true') {
+        from(httpCallKeycloakGetRsaProviders()).pipe(
+            mergeMap(existingSpidRsaProviders => {
+                const existingSpidRsaProvider = existingSpidRsaProviders.find(provider => provider.providerId === 'spid-rsa-generated');
+                const existingConfig = existingSpidRsaProvider?.config;
+                var deleteOrSkip$ = of(null);
+                if (existingSpidRsaProviders.length > 0) {
+                    for (const provider of existingSpidRsaProviders) {
+                        deleteOrSkip$ = deleteOrSkip$.pipe(
+                            mergeMap(() => from(httpCallKeycloakDeleteProvider(provider.id)).pipe(
+                                map(response => {
+                                    if (response.status === 204) {
+                                        return {status: 'deleted', detail: `Deleted existing SPID RSA Provider with id ${provider.id}`};
+                                    } else {
+                                        return {status: 'error', detail: `Failed to delete existing SPID RSA Provider with id ${provider.id}, status code: ${response.status}`};
+                                    }
+                                }),
+                            ))
+                        );
+                    }
+                } else {
+                    deleteOrSkip$ = of({status: 'skipped', detail: 'No existing SPID RSA Provider found, skipping deletion'});
+                }
+                return deleteOrSkip$.pipe(
+                    mergeMap(() => {
+                        const spidRsaProviderConfig = existingConfig || {
+                            algorithm: ["RS256"],
+                            keySize: [2048],
+                        };
+                        const ipaCode = config.otherContactIpaCode;
+                        if (!ipaCode) {
+                            console.error('Missing otherContactIpaCode in configuration, cannot create SPID RSA Provider');
+                            return of({status: 'error', detail: 'Missing otherContactIpaCode in configuration'});
+                        }
+                        const firstOrganizationName = config.organizationNames.split(',', 2)[0].split('|', 2)[1].trim();
+                        const firstOrganizationDisplayName = config.organizationDisplayNames.split(',', 2)[0].split('|', 2)[1].trim();
+                        const firstOrganizationUrl = config.organizationUrls.split(',', 2)[0].split('|', 2)[1].trim();
+                        if (!firstOrganizationName || !firstOrganizationDisplayName || !firstOrganizationUrl) {
+                            console.error('Missing organizationNames or organizationDisplayNames or organizationUrls in configuration, cannot create SPID RSA Provider');
+                            return of({status: 'error', detail: 'Missing organizationNames or organizationDisplayNames or organizationUrls in configuration'});
+                        }
+                        const country = config.organizationCountry;
+                        const locality = config.organizationLocation;
+                        if (!country || !locality) {
+                            console.error('Missing organizationCountry or organizationLocation in configuration, cannot create SPID RSA Provider');
+                            return of({status: 'error', detail: 'Missing organizationCountry or organizationLocation in configuration'});
+                        }
+                        return from(httpCallKeycloakGetRsaKeyPriority()).pipe(
+                            mergeMap(priority => from(httpCallKeycloakCreateSpidRsaProvider({
+                                name: "spid-rsa-generated",
+                                config: {
+                                    ...spidRsaProviderConfig,
+                                    priority: [(priority + 1).toString()],
+                                    enabled: ["true"],
+                                    active: ["true"],
+                                    spidCommonName: [firstOrganizationName],
+                                    spidOrganizationName: [firstOrganizationDisplayName],
+                                    spidEntityId: [firstOrganizationUrl],
+                                    spidIpaCode: [ipaCode],
+                                    spidCountry: [country],
+                                    spidLocality: [locality]
+                                },
+                                providerId: "spid-rsa-generated",
+                                providerType: "org.keycloak.keys.KeyProvider"
+                            })).pipe(
+                                map(response => {
+                                    return {status: response.status, detail: 'SPID RSA Provider created with priority ' + priority};
+                                })
+                            ))
+                        );
+                    })
+                );
+            })
+        ).subscribe(result => {
+            if (result.status === 'error') {
+                console.error('Error creating SPID RSA Provider:', result.detail);
+            } else if (result.status === 'skipped') {
+                console.log('SPID RSA Provider creation skipped:', result.detail);
+            } else {
+                console.log('SPID RSA Provider creation result:', result.detail);
+            }
+        });
+    }
 });

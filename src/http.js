@@ -213,6 +213,96 @@ exports.httpCallKeycloakImportRealm = function () {
     })
 }
 
+exports.httpCallKeycloakGetRsaKeyPriority = function () {
+    return httpGrabKeycloaktoken().then(token => {
+        let axiosConfig = {
+            httpsAgent : agent,
+            method: 'get',
+            url: config.keycloakServerBaseURL + '/admin/realms/' + config.realm + '/keys',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            }
+        };
+        return axios(axiosConfig)
+            .catch(function (error) {
+                handleHttpError(error);
+            })
+            .then(response => {
+                const activeKeys = response.data.keys.filter(key => key.status === 'ACTIVE' && key.type === 'RSA');
+                if (activeKeys.length === 0) {
+                    return 0;
+                }
+                const highestPriority = Math.max(...activeKeys.map(key => parseInt(key.providerPriority)));
+                return highestPriority;
+            });
+    })
+}
+
+exports.httpCallKeycloakGetRsaProviders = function () {
+    return httpGrabKeycloaktoken().then(token => {
+        let axiosConfig = {
+            httpsAgent : agent,
+            method: 'get',
+            url: config.keycloakServerBaseURL + '/admin/realms/' + config.realm + '/components?type=org.keycloak.keys.KeyProvider',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            }
+        };
+        return axios(axiosConfig)
+            .catch(function (error) {
+                handleHttpError(error);
+                throw error;
+            })
+            .then(response => response.data.filter(component => component.providerId === 'spid-rsa-generated' || component.providerId === 'rsa-generated'));
+    })
+}
+
+exports.httpCallKeycloakCreateSpidRsaProvider = function (providerModel) {
+    return httpGrabKeycloaktoken().then(token => {
+        let data = JSON.stringify(providerModel);
+        let axiosConfig = {
+            httpsAgent : agent,
+            method: 'post',
+            url: config.keycloakServerBaseURL + '/admin/realms/' + config.realm + '/components',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            },
+            data: data
+        };
+        return axios(axiosConfig)
+            .catch(function (error) {
+                console.error('Error creating SPID RSA provider');
+                handleHttpError(error);
+                throw error;
+            });
+    })
+}
+
+exports.httpCallKeycloakDeleteProvider = function (id) {
+    return httpGrabKeycloaktoken().then(token => {
+        let axiosConfig = {
+            httpsAgent : agent,
+            method: 'delete',
+            url: config.keycloakServerBaseURL + '/admin/realms/' + config.realm + '/components/' + id,
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            }
+        };
+        return axios(axiosConfig)
+            .catch(function (error) {
+                if (error.response.status == 404)
+                    console.error('No SPID RSA provider found in keycloak to delete');
+                else
+                    handleHttpError('keycloak error: '+error);
+            });
+    })
+}
+
+
 
 const httpCallKeycloakCreateMapper = function (idPAlias, mapperModel) {
     return httpGrabKeycloaktoken().then(token => {
