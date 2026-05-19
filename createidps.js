@@ -1,5 +1,5 @@
 const {from, of, concat, EMPTY} = require('rxjs')
-const {concatMap, map, mergeMap, isEmpty, delay} = require('rxjs/operators')
+const {concatMap, map, mergeMap, isEmpty, delay, tap, count} = require('rxjs/operators')
 const {config, patchTemplate, enrichIdpWithConfigData, boolEnv} = require('./src/common')
 const {
     httpGrabIdPsMetadata,
@@ -141,7 +141,17 @@ var createKeycloackSpidIdPsMappers$ = createSpidIdPsOnKeycloak$.pipe(mergeMap(id
 httpGrabKeycloaktokenOnce().then(token => {
     console.log('Successfully retrieved Keycloak token');
     config.token = token;
-    createKeycloackSpidIdPsMappers$.subscribe(console.log);
+    createKeycloackSpidIdPsMappers$
+        .pipe(
+            tap(result => console.log({ alias: result.alias, create_response: result.create_response })),
+            count()
+        )
+        .subscribe({
+            // Stderr so the summary is visible in the terminal even when the npm
+            // script redirects stdout to log/create-idps.log.
+            next: n => console.error(`Done: configured ${n} IdP(s) on Keycloak realm '${config.realm}'`),
+            error: err => console.error('Failed to configure IdPs:', err?.message ?? err)
+        });
     if (boolEnv('createSpidRsaProvider', false)) {
         from(httpCallKeycloakGetRsaProviders()).pipe(
             mergeMap(existingSpidRsaProviders => {

@@ -118,7 +118,7 @@ exports.httpCallKeycloakDeleteIdP = function (idPAlias) {
         return axios(axiosConfig)
             .catch(function (error) {
                 if (error.response.status == 404)
-                    console.error('No IdP '+idPAlias+' found in keycloak to delete');
+                    console.log(`IdP '${idPAlias}' not found in Keycloak, skipping delete`);
                 else
                     handleHttpError('keycloak error: '+error);
             });
