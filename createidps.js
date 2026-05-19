@@ -1,6 +1,6 @@
 const {from, of, concat, EMPTY} = require('rxjs')
 const {concatMap, map, mergeMap, isEmpty, delay} = require('rxjs/operators')
-const {config, patchTemplate, enrichIdpWithConfigData} = require('./src/common')
+const {config, patchTemplate, enrichIdpWithConfigData, boolEnv} = require('./src/common')
 const {
     httpGrabIdPsMetadata,
     httpCallKeycloakImportConfig,
@@ -29,7 +29,7 @@ else
     getOfficialSpididPsMetadata$ = EMPTY;
 
 
-if (config.createSpidTestIdP === 'true') {
+if (boolEnv('createSpidTestIdP', false)) {
     let spidTestIdPOfficialMetadata = {
         code: config.spidTestIdPAlias,
         organization_name: config.spidTestIdPAlias,
@@ -40,7 +40,7 @@ if (config.createSpidTestIdP === 'true') {
     getOfficialSpididPsMetadata$ = concat(getOfficialSpididPsMetadata$, of(enrichIdpWithConfigData(spidTestIdPOfficialMetadata)));    
 }
 
-if (config.createSpidValidatorIdP === 'true') {
+if (boolEnv('createSpidValidatorIdP', false)) {
     let spidValidatorIdPOfficialMetadata = {
         code: config.spidValidatorIdPAlias,
         organization_name: config.spidValidatorIdPAlias,
@@ -51,7 +51,7 @@ if (config.createSpidValidatorIdP === 'true') {
     getOfficialSpididPsMetadata$ = concat(getOfficialSpididPsMetadata$, of(enrichIdpWithConfigData(spidValidatorIdPOfficialMetadata)))
 }
 
-if (config.createSpidDemoIdP === 'true') {
+if (boolEnv('createSpidDemoIdP', false)) {
     let spidDemoIdPOfficialMetadata = {
         code: config.spidDemoIdPAlias,
         organization_name: config.spidDemoIdPAlias,
@@ -62,7 +62,7 @@ if (config.createSpidDemoIdP === 'true') {
     getOfficialSpididPsMetadata$ = concat(getOfficialSpididPsMetadata$, of(enrichIdpWithConfigData(spidDemoIdPOfficialMetadata)))
 }
 
-if (config.createSpidTestDemoIdP === 'true') {
+if (boolEnv('createSpidTestDemoIdP', false)) {
     let spidTestLocalDemoMetadata = {
         code: config.spidTestDemoIdPAlias,
         organization_name: config.spidTestDemoIdPAlias,
@@ -73,7 +73,7 @@ if (config.createSpidTestDemoIdP === 'true') {
     getOfficialSpididPsMetadata$ = concat(getOfficialSpididPsMetadata$, of(enrichIdpWithConfigData(spidTestLocalDemoMetadata)));       
 }
 
-if (config.createSpidSpTestIdP === 'true') {
+if (boolEnv('createSpidSpTestIdP', false)) {
     let spidSpTestMetadata = {
         code: config.spidSpTestIdPAlias,
         organization_name: config.spidSpTestIdPAlias,
@@ -142,7 +142,7 @@ httpGrabKeycloaktokenOnce().then(token => {
     console.log('Successfully retrieved Keycloak token');
     config.token = token;
     createKeycloackSpidIdPsMappers$.subscribe(console.log);
-    if (config.createSpidRsaProvider === 'true') {
+    if (boolEnv('createSpidRsaProvider', false)) {
         from(httpCallKeycloakGetRsaProviders()).pipe(
             mergeMap(existingSpidRsaProviders => {
                 const existingSpidRsaProvider = existingSpidRsaProviders.find(provider => provider.providerId === 'spid-rsa-generated');
