@@ -4,22 +4,8 @@ const axios = require('axios')
 const https = require('https')
 const {
   usernameMapperTemplate,
-  lastnameMapperTemplate,
-  firstnameMapperTemplate,
-  spidCodeMapperTemplate,
-  emailMapperTemplate,
-  taxIdMapperTemplate,
-  genderMapperTemplate,
-  dateOfBirthMapperTemplate,
-  placeOfBirthMapperTemplate,
-  countyOfBirthMapperTemplate,
-  mobilePhoneMapperTemplate,
-  addressMapperTemplate,
-  digitalAddressMapperTemplate,
-  companyNameMapperTemplate,
-  companyAddressMapperTemplate,
-  vatNumberapperTemplate,
-  patchTemplate
+  patchTemplate,
+  getRequestedAttributes
 } = require('./common')
 
 const agent = new https.Agent({
@@ -132,7 +118,7 @@ exports.httpCallKeycloakDeleteIdP = function (idPAlias) {
         return axios(axiosConfig)
             .catch(function (error) {
                 if (error.response.status == 404)
-                    console.error('No IdP '+idPAlias+' found in keycloak to delete');
+                    console.log(`IdP '${idPAlias}' not found in Keycloak, skipping delete`);
                 else
                     handleHttpError('keycloak error: '+error);
             });
@@ -173,24 +159,13 @@ exports.httpCallKeycloakGetIpdDescription = function (idpAlias) {
 
 
 exports.httpCallKeycloakCreateAllMappers = function (idPAlias) {
-    return Promise.all([
-        httpCallKeycloakCreateMapper(idPAlias, usernameMapperTemplate),
-        httpCallKeycloakCreateMapper(idPAlias, lastnameMapperTemplate),
-        httpCallKeycloakCreateMapper(idPAlias, firstnameMapperTemplate),
-        httpCallKeycloakCreateMapper(idPAlias, spidCodeMapperTemplate),
-        httpCallKeycloakCreateMapper(idPAlias, emailMapperTemplate),
-        httpCallKeycloakCreateMapper(idPAlias, taxIdMapperTemplate),
-        httpCallKeycloakCreateMapper(idPAlias, genderMapperTemplate),
-        httpCallKeycloakCreateMapper(idPAlias, dateOfBirthMapperTemplate),
-        httpCallKeycloakCreateMapper(idPAlias, placeOfBirthMapperTemplate),
-        httpCallKeycloakCreateMapper(idPAlias, countyOfBirthMapperTemplate),
-        httpCallKeycloakCreateMapper(idPAlias, mobilePhoneMapperTemplate),
-        httpCallKeycloakCreateMapper(idPAlias, addressMapperTemplate),
-        httpCallKeycloakCreateMapper(idPAlias, digitalAddressMapperTemplate)
-        // httpCallKeycloakCreateMapper(idPAlias, companyNameMapperTemplate),
-        // httpCallKeycloakCreateMapper(idPAlias, companyAddressMapperTemplate),
-        // httpCallKeycloakCreateMapper(idPAlias, vatNumberapperTemplate),
-    ])
+    const attrs = getRequestedAttributes().filter(a => a.mapper);
+    console.log(`Creating mappers for IdP '${idPAlias}': username, ` + attrs.map(a => a.key).join(', '));
+    const calls = [httpCallKeycloakCreateMapper(idPAlias, usernameMapperTemplate)];
+    for (const attr of attrs) {
+        calls.push(httpCallKeycloakCreateMapper(idPAlias, attr.mapper));
+    }
+    return Promise.all(calls);
 }
 
 exports.httpCallKeycloakImportRealm = function () {

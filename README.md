@@ -79,6 +79,21 @@ By default, the new IdPs are created with a SPID-specific Authentication Flow, a
 
 <img width="1455" alt="image" src="https://user-images.githubusercontent.com/2743637/212534098-d6add32d-db1b-4c63-b203-f37f78fee8f9.png">
 
+## Customizing requested SPID attributes
+By default the tool requests the standard SPID attribute set (`spidCode`, `name`, `familyName`, `fiscalNumber`, `email`, `gender`, `dateOfBirth`, `placeOfBirth`, `countyOfBirth`, `mobilePhone`, `address`, `digitalAddress`, plus the metadata-only `idCard`, `registeredOffice`, `expirationDate`).
+
+You can override the list via `.env`:
+
+```
+requestedAttributes = spidCode,name,familyName,fiscalNumber,email
+```
+
+Only the attributes you list will be (a) declared in the SP metadata `<md:RequestedAttribute>` block and (b) created as Keycloak attribute mappers on each IdP. The `username` (principal) mapper is always created.
+
+Opt-in attributes not in the default list: `companyName`, `companyAddress`, `ivaCode`.
+
+Set `requestedAttributesStrict = false` to tolerate unknown attribute names with a warning. Default is `true` (fail fast on typos).
+
 ## SPID access button integrated in Keycloak theme
 https://github.com/nicolabeghin/keycloak-spid-provider-configuration-client/wiki/SPID-access-button-integrated-in-Keycloak-theme
 <img width="285" alt="image" src="https://user-images.githubusercontent.com/2743637/212535193-aae9e8ce-b4f1-4411-9811-def46419bacf.png">
