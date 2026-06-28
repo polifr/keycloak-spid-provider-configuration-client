@@ -24,6 +24,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Setup default configuration
+        run: cp .env-example .env
+
       - if: github.event_name != 'pull_request'
         uses: docker/login-action@v4
         with:
